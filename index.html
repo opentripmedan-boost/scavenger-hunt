@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Scavenger Hunt</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { font-family: Arial, sans-serif; padding: 15px; max-width: 600px; margin: auto; }
+    #map { height: 300px; width: 100%; margin-bottom: 20px; border-radius: 8px; z-index: 1;}
+    .box { border: 2px solid #333; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+    .feed-item { background: #f4f4f4; border-left: 5px solid #ff4500; margin-bottom: 10px; padding: 10px; }
+    button { background: #ff4500; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>🗺️ Scavenger Hunt Live!</h2>
+
+  <div class="box">
+    <h3>1. Titik Tugas (Peta)</h3>
+    <div id="map"></div>
+  </div>
+
+  <div class="box">
+    <h3>2. Upload Bukti Tugas</h3>
+    <input type="text" id="namaGrup" placeholder="Nama Grup Lu (Contoh: Tim Alpha)" style="padding: 8px; width: 90%; margin-bottom: 10px;"/><br>
+    <input type="file" id="fileTugas" accept="image/*,video/*" style="margin-bottom: 10px;"/><br>
+    <button onclick="kirimTugas()">Kirim Tugas Sekarang!</button>
+  </div>
+
+  <div class="box">
+    <h3>3. Live Feed (Aktivitas Peserta)</h3>
+    <div id="liveFeed"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+
+  <script>
+    // Kode rahasia lu udah gue masukin langsung ke sini bro
+    const firebaseConfig = {
+  apiKey: "AIzaSyDXyV5osFDRAPewRUdYxApva5mhksiLwgQ",
+  authDomain: "scavyplay.firebaseapp.com",
+  projectId: "scavyplay",
+  storageBucket: "scavyplay.firebasestorage.app",
+  messagingSenderId: "393425670663",
+  appId: "1:393425670663:web:22a24d2583c219eb1790a2",
+  measurementId: "G-SRVN48V46T"
+};
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // Setting Peta
+    const map = L.map('map').setView([5.5483, 95.3238], 14); 
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.marker([5.5483, 95.3238]).addTo(map).bindPopup('Checkpoint 1: Upload foto di sini!').openPopup();
+
+    // Fungsi Kirim Tugas
+    async function kirimTugas() {
+      const nama = document.getElementById('namaGrup').value;
+      const file = document.getElementById('fileTugas').files[0];
+
+      if (!nama || !file) {
+        alert('Bro, isi nama grup sama pilih fotonya dulu!');
+        return;
+      }
+
+      alert('Lagi proses upload... Tunggu bentar ya!');
+
+      const refPenyimpanan = storage.ref('bukti_tugas/' + file.name);
+      await refPenyimpanan.put(file);
+      const urlFile = await refPenyimpanan.getDownloadURL();
+
+      await db.collection('aktivitas_peserta').add({
+        grup: nama,
+        linkFile: urlFile,
+        waktu: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      alert('Mantap! Tugas berhasil dikirim.');
+    }
+
+    // Fungsi Narik Data Real-Time
+    db.collection('aktivitas_peserta').orderBy('waktu', 'desc').onSnapshot((snapshot) => {
+      const tempatFeed = document.getElementById('liveFeed');
+      tempatFeed.innerHTML = ''; 
+      snapshot.forEach((dokumen) => {
+        const data = dokumen.data();
+        tempatFeed.innerHTML += `
+          <div class="feed-item">
+            <strong>🚀 Grup: ${data.grup}</strong><br>
+            <a href="${data.linkFile}" target="_blank">Lihat Foto/Video Tugas</a><br>
+            <small style="color: grey;">Nilai: (Menunggu Admin)</small>
+          </div>
+        `;
+      });
+    });
+  </script>
+</body>
+</html>
