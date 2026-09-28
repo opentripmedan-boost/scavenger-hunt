@@ -8,35 +8,61 @@
   <style>
     body { font-family: sans-serif; margin: 0; padding: 15px; background: #f4f4f9; color: #333; }
     .box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    #map { height: 300px; width: 100%; border-radius: 8px; }
+    #map { height: 250px; width: 100%; border-radius: 8px; }
     input, button { width: 100%; padding: 12px; margin-top: 10px; box-sizing: border-box; font-size: 16px; border-radius: 6px; }
     input { border: 1px solid #ccc; }
     button { background: #ff5722; color: white; border: none; font-weight: bold; cursor: pointer; }
     button:disabled { background: #ccc; }
     .feed-item { border-bottom: 1px solid #eee; padding: 12px 0; }
     .feed-item img { max-width: 100%; border-radius: 6px; margin-top: 8px; }
+    .route-card { background: #e3f2fd; border-left: 5px solid #2196f3; padding: 10px 15px; border-radius: 4px; margin-top: 10px; font-weight: bold; line-height: 1.5; white-space: pre-wrap; }
+    #mainApp { display: none; }
   </style>
 </head>
 <body>
 
   <h2>🎮 ScavyPlay</h2>
 
-  <div class="box">
-    <h3>1. Titik Tugas (Peta)</h3>
-    <div id="map"></div>
+  <!-- SCREEN 1: LOGIN NAMA TIM -->
+  <div id="loginScreen" class="box" style="text-align: center; padding: 30px 15px;">
+    <h3>Selamat Datang Peserta! 👋</h3>
+    <p>Masukkan nama grup kalian untuk melihat arahan rute tugas.</p>
+    <input type="text" id="inputTeamName" placeholder="Contoh: Tim Alpha">
+    <button onclick="loginTeam()">Mulai Petualangan 🚀</button>
   </div>
 
-  <div class="box">
-    <h3>2. Upload Bukti Tugas</h3>
-    <input type="text" id="teamName" placeholder="Nama Grup Lu (Contoh: Tim Alpha)">
-    <input type="file" id="photoInput" accept="image/*">
-    <button id="uploadBtn" onclick="submitTask()">Kirim Tugas Sekarang!</button>
-    <p id="statusMsg" style="font-size: 14px; color: #666; font-weight: bold; margin-top: 8px;"></p>
-  </div>
+  <!-- SCREEN 2: APLIKASI UTAMA -->
+  <div id="mainApp">
+    
+    <!-- INFO TIM & RUTE -->
+    <div class="box">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 id="displayTeamName" style="margin:0; color:#ff5722;">-</h3>
+        <small><a href="#" onclick="logoutTeam()" style="color:#999;">Ganti Tim</a></small>
+      </div>
+      <div id="routeInfo" class="route-card">Memuat rute dari admin...</div>
+    </div>
 
-  <div class="box">
-    <h3>3. Live Feed</h3>
-    <div id="feed">Memuat data...</div>
+    <!-- PETA LOKASI -->
+    <div class="box">
+      <h3>1. Titik Tugas (Peta)</h3>
+      <div id="map"></div>
+    </div>
+
+    <!-- UPLOAD FOTO -->
+    <div class="box">
+      <h3>2. Upload Bukti Tugas</h3>
+      <input type="file" id="photoInput" accept="image/*">
+      <button id="uploadBtn" onclick="submitTask()">Kirim Tugas Sekarang!</button>
+      <p id="statusMsg" style="font-size: 14px; color: #666; font-weight: bold; margin-top: 8px;"></p>
+    </div>
+
+    <!-- LIVE FEED -->
+    <div class="box">
+      <h3>3. Live Feed</h3>
+      <div id="feed">Memuat data...</div>
+    </div>
+
   </div>
 
   <!-- Firebase & Leaflet SDKs -->
@@ -45,7 +71,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // Config Firebase ScavyPlay
     const firebaseConfig = {
       apiKey: "AIzaSyDXyV5osFDRAPewRUdYxApva5mhksiLwgQ",
       authDomain: "scavyplay.firebaseapp.com",
@@ -59,17 +84,53 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Inisialisasi Peta (Default Medan)
-    const map = L.map('map').setView([3.5952, 98.6722], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: 'OpenStreetMap'
-    }).addTo(map);
+    let currentTeam = "";
+    let map;
 
-    L.marker([3.5952, 98.6722]).addTo(map)
-      .bindPopup("<b>Checkpoint 1</b><br>Upload foto kegiatan kalian di sini!")
-      .openPopup();
+    window.onload = function() {
+      const savedTeam = localStorage.getItem("scavy_team");
+      if (savedTeam) initApp(savedTeam);
+    };
 
-    // Fungsi Kompres Foto
+    function loginTeam() {
+      const name = document.getElementById("inputTeamName").value.trim();
+      if (!name) return alert("Ketik nama grup dulu bro!");
+      localStorage.setItem("scavy_team", name);
+      initApp(name);
+    }
+
+    function logoutTeam() {
+      if (confirm("Yakin mau keluar/ganti tim?")) {
+        localStorage.removeItem("scavy_team");
+        location.reload();
+      }
+    }
+
+    function initApp(teamName) {
+      currentTeam = teamName;
+      document.getElementById("loginScreen").style.display = "none";
+      document.getElementById("mainApp").style.display = "block";
+      document.getElementById("displayTeamName").innerText = "🚩 " + teamName;
+
+      // GET RUTE DARI FIRESTORE SECARA REALTIME
+      db.collection("routes").doc(teamName.toLowerCase()).onSnapshot((doc) => {
+        const routeContainer = document.getElementById("routeInfo");
+        if (doc.exists) {
+          routeContainer.innerHTML = "📍 <b>ARAHAN RUTE KAMU:</b>\n" + doc.data().routeText;
+        } else {
+          routeContainer.innerHTML = "📍 <b>RUTE UMUM:</b>\nAdmin belum menentukan rute khusus untuk tim ini. Silakan ikuti arahan panitia di lapangan!";
+        }
+      });
+
+      if (!map) {
+        map = L.map('map').setView([3.5952, 98.6722], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OpenStreetMap' }).addTo(map);
+        L.marker([3.5952, 98.6722]).addTo(map).bindPopup("<b>Checkpoint Utama</b>").openPopup();
+      }
+      
+      listenLiveFeed();
+    }
+
     function compressAndConvert(file, maxWidth, quality) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -79,58 +140,44 @@
           img.src = event.target.result;
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-
+            let width = img.width, height = img.height;
             if (width > maxWidth) {
               height = Math.round((height * maxWidth) / width);
               width = maxWidth;
             }
-
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = width; canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
             resolve(canvas.toDataURL('image/jpeg', quality));
           };
-          img.onerror = (err) => reject(err);
         };
-        reader.onerror = (err) => reject(err);
       });
     }
 
-    // Fungsi Kirim Tugas
     async function submitTask() {
-      const teamName = document.getElementById('teamName').value.trim();
       const fileInput = document.getElementById('photoInput');
       const btn = document.getElementById('uploadBtn');
       const status = document.getElementById('statusMsg');
 
-      if (!teamName) return alert("Isi nama grup dulu bro!");
       if (!fileInput.files[0]) return alert("Pilih foto dulu bro!");
 
       btn.disabled = true;
-      status.innerText = "⏳ Memproses & mengompres foto...";
+      status.innerText = "⏳ Memproses foto...";
 
       try {
-        const file = fileInput.files[0];
-        // Kompres gambar otomatis biar muat di database gratisan
-        const base64Image = await compressAndConvert(file, 600, 0.5);
-
-        status.innerText = "🚀 Mengirim ke server...";
+        const base64Image = await compressAndConvert(fileInput.files[0], 600, 0.5);
+        status.innerText = "🚀 Mengirim data...";
 
         await db.collection("submissions").add({
-          team: teamName,
+          team: currentTeam,
           photo: base64Image,
           timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
 
         alert("Mantap! Tugas berhasil dikirim.");
-        document.getElementById('teamName').value = "";
         fileInput.value = "";
         status.innerText = "✅ Berhasil dikirim!";
       } catch (error) {
-        console.error(error);
         alert("Gagal kirim: " + error.message);
         status.innerText = "❌ Gagal mengunggah.";
       } finally {
@@ -138,10 +185,8 @@
       }
     }
 
-    // Realtime Listener
-    db.collection("submissions")
-      .orderBy("timestamp", "desc")
-      .onSnapshot((snapshot) => {
+    function listenLiveFeed() {
+      db.collection("submissions").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
         const feedContainer = document.getElementById('feed');
         if (snapshot.empty) {
           feedContainer.innerHTML = "<p>Belum ada yang kirim tugas.</p>";
@@ -161,6 +206,7 @@
         });
         feedContainer.innerHTML = html;
       });
+    }
   </script>
 </body>
 </html>
