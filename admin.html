@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - ScavyPlay</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 20px; background: #1e1e2f; color: #fff; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 15px; }
+    .card { background: #2d2d44; border-radius: 8px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+    .card img { width: 100%; height: 180px; object-fit: cover; border-radius: 6px; margin-top: 10px; }
+    .btn-delete { background: #ff4757; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
+    input, textarea { width: 100%; padding: 10px; margin-top: 8px; box-sizing: border-box; border-radius: 6px; border: 1px solid #444; background: #1e1e2f; color: #fff; }
+    button.btn-save { background: #2196f3; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 10px; }
+    .section-title { margin-top: 30px; border-left: 4px solid #ff5722; padding-left: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>🛡️ Admin Dashboard - ScavyPlay</h2>
+    <span id="totalCount">Total: 0 Foto</span>
+  </div>
+
+  <!-- KELOLA RUTE TIM -->
+  <h3 class="section-title">📍 Kelola & Edit Rute Tim</h3>
+  <div class="card" style="max-width: 500px;">
+    <label><b>Nama Tim:</b></label>
+    <input type="text" id="routeTeamName" placeholder="Contoh: Tim Alpha">
+    
+    <label style="display:block; margin-top:10px;"><b>Arahan Rute / Instruksi:</b></label>
+    <textarea id="routeText" rows="3" placeholder="Contoh: Pos 1 (Taman) ➔ Pos 2 (Kantin) ➔ Pos 3 (Aula)"></textarea>
+    
+    <button class="btn-save" onclick="saveRoute()">💾 Simpan / Update Rute</button>
+  </div>
+
+  <h4 style="margin-top: 20px; color: #aaa;">Daftar Rute Terdaftar:</h4>
+  <div id="routeListGrid" class="grid">Memuat rute...</div>
+
+  <!-- HASIL KIRIMAN FOTO PESERTA -->
+  <h3 class="section-title">📸 Live Feed Foto Peserta</h3>
+  <div id="adminFeed" class="grid">Memuat data...</div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    const ADMIN_PIN = "1234"; // Ganti PIN Rahasia Lu di Sini
+
+    const inputPin = prompt("Masukkan PIN Rahasia Admin:");
+    if (inputPin !== ADMIN_PIN) {
+      alert("PIN Salah! Akses ditolak.");
+      document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>❌ Akses Ditolak!</h2>";
+    } else {
+      const firebaseConfig = {
+        apiKey: "AIzaSyDXyV5osFDRAPewRUdYxApva5mhksiLwgQ",
+        authDomain: "scavyplay.firebaseapp.com",
+        projectId: "scavyplay",
+        storageBucket: "scavyplay.firebasestorage.app",
+        messagingSenderId: "393425670663",
+        appId: "1:393425670663:web:22a24d2583c219eb1790a2",
+        measurementId: "G-SRVN48V46T"
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      // 1. FUNGSI SIMPAN/UPDATE RUTE
+      window.saveRoute = async function() {
+        const team = document.getElementById("routeTeamName").value.trim();
+        const text = document.getElementById("routeText").value.trim();
+
+        if (!team || !text) return alert("Isi nama tim dan instruksi rutenya dulu bro!");
+
+        try {
+          await db.collection("routes").doc(team.toLowerCase()).set({
+            teamNameOriginal: team,
+            routeText: text,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          alert("✅ Rute untuk " + team + " berhasil disimpan!");
+          document.getElementById("routeTeamName").value = "";
+          document.getElementById("routeText").value = "";
+        } catch (e) {
+          alert("Gagal simpan rute: " + e.message);
+        }
+      };
+
+      // 2. LISTEN LIST RUTE REALTIME
+      db.collection("routes").onSnapshot((snapshot) => {
+        const container = document.getElementById("routeListGrid");
+        if (snapshot.empty) {
+          container.innerHTML = "<p style='color:#aaa;'>Belum ada rute tim yang dibuat.</p>";
+          return;
+        }
+
+        let html = "";
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const docId = doc.id;
+          html += `
+            <div class="card" style="border-left: 4px solid #2196f3;">
+              <h4 style="margin:0; color:#2196f3;">🚩 ${data.teamNameOriginal}</h4>
+              <p style="white-space: pre-wrap; font-size:14px; margin: 10px 0; color:#ddd;">${data.routeText}</p>
+              <button class="btn-delete" onclick="deleteRoute('${docId}')">🗑️ Hapus Rute</button>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      });
+
+      window.deleteRoute = async function(docId) {
+        if (confirm("Yakin mau hapus rute ini?")) {
+          await db.collection("routes").doc(docId).delete();
+        }
+      };
+
+      // 3. LISTEN FOTO PESERTA REALTIME
+      db.collection("submissions").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+        document.getElementById("totalCount").innerText = "Total: " + snapshot.size + " Kiriman";
+        const container = document.getElementById("adminFeed");
+        
+        if (snapshot.empty) {
+          container.innerHTML = "<p style='color:#aaa;'>Belum ada kiriman foto.</p>";
+          return;
+        }
+
+        let html = "";
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const docId = doc.id;
+          const time = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : "Baru saja";
+
+          html += `
+            <div class="card">
+              <h3 style="margin:0; color:#ffa502;">${data.team}</h3>
+              <small style="color:#aaa;">⏰ ${time}</small><br>
+              <img src="${data.photo}">
+              <button class="btn-delete" onclick="deleteDoc('${docId}')">🗑️ Hapus Foto</button>
+            </div>
+          `;
+        });
+        container.innerHTML = html;
+      });
+
+      window.deleteDoc = async function(id) {
+        if (confirm("Yakin mau hapus foto ini?")) {
+          await db.collection("submissions").doc(id).delete();
+        }
+      };
+    }
+  </script>
+</body>
+</html>
