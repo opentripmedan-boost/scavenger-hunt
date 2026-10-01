@@ -31,7 +31,7 @@
 
   <!-- SCREEN 1: LOGIN NAMA TIM -->
   <div id="loginScreen" class="box" style="text-align: center; padding: 30px 15px;">
-    <h3>Selamat Datang Peserta! 👋</h3>
+    <h3>Semangat Pagi Peserta Outbound! 👋</h3>
     <p>Masukkan nama grup kalian untuk melihat arahan rute tugas.</p>
     <input type="text" id="inputTeamName" placeholder="Contoh: Tim Alpha">
     <button onclick="loginTeam()">Mulai Petualangan 🚀</button>
@@ -100,7 +100,7 @@
 
     function loginTeam() {
       const name = document.getElementById("inputTeamName").value.trim();
-      if (!name) return alert("Ketik nama grup dulu bro!");
+      if (!name) return alert("Ketik nama grup dulu bossku!");
       localStorage.setItem("scavy_team", name);
       initApp(name);
     }
@@ -124,7 +124,7 @@
         if (doc.exists) {
           routeContainer.innerHTML = "📍 <b>ARAHAN RUTE KAMU:</b>\n" + doc.data().routeText;
         } else {
-          routeContainer.innerHTML = "📍 <b>RUTE UMUM:</b>\nAdmin belum menentukan rute khusus untuk tim ini. Silakan ikuti arahan panitia di lapangan!";
+          routeContainer.innerHTML = "📍 <b>RUTE UMUM:</b>\nAdmin belum menentukan rute khusus untuk tim ini. Silakan ikuti arahan Fasilitator di lapangan!";
         }
       });
 
@@ -165,7 +165,7 @@
       const btn = document.getElementById('uploadBtn');
       const status = document.getElementById('statusMsg');
 
-      if (!fileInput.files[0]) return alert("Pilih foto dulu bro!");
+      if (!fileInput.files[0]) return alert("Pilih foto dulu boss!");
 
       btn.disabled = true;
       status.innerText = "⏳ Memproses foto...";
